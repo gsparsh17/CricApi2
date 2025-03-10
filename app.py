@@ -8,6 +8,7 @@ CORS(app)
 
 BASE_URL = "https://www.crictracker.com/live-scores/"
 UPCOMING_URL = "https://www.crictracker.com/live-scores/upcoming/"
+NEWS_URL = "https://www.crictracker.com/cricket-news/"
 
 def fetch_matches(url):
     response = requests.get(url)
@@ -46,6 +47,52 @@ def fetch_matches(url):
     
     return matches
 
+def fetch_news():
+    response = requests.get(NEWS_URL)
+    if response.status_code != 200:
+        return []
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    news_articles = []
+    articles = soup.find_all("article", class_="style_article__c_e_v")
+    
+    for article in articles:
+        news_item = {}
+        
+        # Extract title
+        title_elem = article.find("h3")
+        news_item['title'] = title_elem.text.strip() if title_elem else article.find("h4").text.strip()
+        
+        # Extract description
+        description_elem = article.find("p")
+        news_item['description'] = description_elem.text.strip() if description_elem else ""
+        
+        # Extract image URL
+        image_elem = article.find("img")
+        news_item['image'] = image_elem['src'] if image_elem else ""
+        
+        # Extract article URL
+        link_elem = article.find("a")
+        news_item['url'] = "https://www.crictracker.com" + link_elem['href'] if link_elem else ""
+        
+        # Extract date and read time
+        article_info = article.find("div", class_="style_articleInfo__HCuxg")
+        if article_info:
+            spans = article_info.find_all("span")
+            if len(spans) >= 2:
+                news_item['date'] = spans[0].text.strip()
+                news_item['read_time'] = spans[1].text.strip()
+            else:
+                news_item['date'] = "Unknown Date"
+                news_item['read_time'] = "Unknown Read Time"
+        else:
+            news_item['date'] = "Unknown Date"
+            news_item['read_time'] = "Unknown Read Time"
+        
+        news_articles.append(news_item)
+    
+    return news_articles
+
 @app.route('/live-matches', methods=['GET'])
 def get_live_matches():
     matches = fetch_matches(BASE_URL)
@@ -55,6 +102,11 @@ def get_live_matches():
 def get_upcoming_matches():
     matches = fetch_matches(UPCOMING_URL)
     return jsonify({'upcoming_matches': matches})
+
+@app.route('/news', methods=['GET'])
+def get_news():
+    news = fetch_news()
+    return jsonify({'news': news})
 
 @app.route('/scrape_scorecard', methods=['GET'])
 def scrape_scorecard():
